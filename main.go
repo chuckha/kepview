@@ -12,20 +12,33 @@ import (
 	"github.com/pkg/errors"
 )
 
-/*
-	kepctl list
-	<prints out list in most recent commit order>
+type config struct {
+	root      string
+	debug     bool
+	filters   filters
+	sortField string
+}
 
-	// V2
-	kepctl search term term term
-	# kep name
-	...something <highlighted>term term</hilighted> something...
+func main() {
+	configuration := &config{}
+	list := flag.NewFlagSet("list", flag.ExitOnError)
+	list.StringVar(&configuration.root, "keps", filepath.Join("enhancements", "keps"), "the location of the keps directory")
+	list.BoolVar(&configuration.debug, "debug", false, "see debug logs")
+	list.Var(&configuration.filters, "filters", "filter keps based on a fields and values (field=value,field2=value2)")
+	list.StringVar(&configuration.sortField, "sort-by", "", "field to sort proposals by, descending")
+	list.Parse(os.Args[1:])
 
-	...
-
-	keptcl list -filter <filed>=<value> -filter ... -sort <field>
-	<print list filtered by filters and sorted by field
-*/
+	out := &keps.Proposals{}
+	if err := filepath.Walk(configuration.root,
+		FindEnhancements(out, &Opener{}, keps.NewParser(), &Logger{configuration.debug}, configuration.filters...)); err != nil {
+		fmt.Printf("%+v", err)
+		os.Exit(2)
+	}
+	out.SortBy(configuration.sortField)
+	for _, proposal := range *out {
+		fmt.Printf("%v\n", proposal.Filename)
+	}
+}
 
 type filters []filter
 
@@ -54,34 +67,6 @@ type filter struct {
 
 func newFilter(field, value string) filter {
 	return filter{field, value}
-}
-
-type config struct {
-	root      string
-	debug     bool
-	filters   filters
-	sortField string
-}
-
-func main() {
-	configuration := &config{}
-	list := flag.NewFlagSet("list", flag.ExitOnError)
-	list.StringVar(&configuration.root, "keps", filepath.Join("enhancements", "keps"), "the location of the keps directory")
-	list.BoolVar(&configuration.debug, "debug", false, "see debug logs")
-	list.Var(&configuration.filters, "filters", "filter keps based on a fields and values (field=value,field2=value2)")
-	list.StringVar(&configuration.sortField, "sort-by", "", "field to sort proposals by, descending")
-	list.Parse(os.Args[1:])
-
-	out := &keps.Proposals{}
-	if err := filepath.Walk(configuration.root,
-		FindEnhancements(out, &Opener{}, keps.NewParser(), &Logger{configuration.debug}, configuration.filters...)); err != nil {
-		fmt.Printf("%+v", err)
-		os.Exit(2)
-	}
-	out.SortBy(configuration.sortField)
-	for _, proposal := range *out {
-		fmt.Printf("%v\n", proposal.Filename)
-	}
 }
 
 type Logger struct {
