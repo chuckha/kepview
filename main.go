@@ -80,7 +80,7 @@ func main() {
 	}
 	out.SortBy(configuration.sortField)
 	for _, proposal := range *out {
-		fmt.Printf("%v: %v\n", proposal.CreationDate, proposal.Title)
+		fmt.Printf("%v\n", proposal.Filename)
 	}
 }
 
@@ -147,7 +147,7 @@ func FindEnhancements(out *keps.Proposals, opener opener, parser parser, log log
 				return nil
 			}
 		}
-		kep.Filename = info.Name()
+		kep.Filename = path
 		out.AddProposal(kep)
 		return nil
 	}

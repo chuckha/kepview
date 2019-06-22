@@ -99,7 +99,7 @@ func TestFindEnhancementsFindsEnhancements(t *testing.T) {
 			if len(*out) != 1 {
 				t.Fatalf("Expected 1 item but found: %v", out)
 			}
-			if (*out)[0].Filename != tc.filename {
+			if (*out)[0].Filename != "test" {
 				t.Fatalf("expected proposal to have a filename of %q but had %q", tc.filename, (*out)[0].Filename)
 			}
 		})
