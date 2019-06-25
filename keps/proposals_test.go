@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/chuckha/kepctl/keps"
+	"github.com/chuckha/kepview/keps"
 )
 
 func TestValidParsing(t *testing.T) {

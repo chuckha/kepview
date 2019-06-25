@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chuckha/kepctl/keps"
+	"github.com/chuckha/kepview/keps"
 )
 
 type info struct {

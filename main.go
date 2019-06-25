@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/chuckha/kepctl/keps"
+	"github.com/chuckha/kepview/keps"
 	"github.com/pkg/errors"
 )
 
