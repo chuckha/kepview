@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/chuckha/kepview/keps/validations"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 )
@@ -97,6 +98,15 @@ func (p *Parser) Parse(in io.Reader) (*Proposal, error) {
 	if err := scanner.Err(); err != nil {
 		return nil, errors.WithStack(err)
 	}
+	// First do structural checks
+	test := map[interface{}]interface{}{}
+	if err := yaml.Unmarshal(metadata, test); err != nil {
+		return nil, errors.WithStack(err)
+	}
+	if err := validations.ValidateStructure(test); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
 	proposal := &Proposal{}
 	err := yaml.Unmarshal(metadata, proposal)
 	return proposal, errors.WithStack(err)

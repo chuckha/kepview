@@ -116,6 +116,10 @@ func FindEnhancements(out *keps.Proposals, opener opener, parser parser, log log
 		if strings.HasSuffix(info.Name(), "template.md") {
 			return nil
 		}
+		// Ignore kep-faq
+		if info.Name() == "kep-faq.md" {
+			return nil
+		}
 		file, err := opener.Open(path)
 		if err != nil {
 			return errors.Wrapf(err, "filename: %v", path)
