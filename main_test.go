@@ -40,6 +40,15 @@ type mylogger struct{}
 
 func (l *mylogger) Debugf(format string, args ...interface{}) {}
 
+func defaultTestEnhancementFinder(...finderOpts) *EnhancementFinder {
+	return &EnhancementFinder{
+		opener:          &myopener{},
+		parser:          &myparser{},
+		log:             &mylogger{},
+		filenameFilters: defaultFilters(),
+	}
+}
+
 func TestFindEnhancementsIgnores(t *testing.T) {
 	testcases := []struct {
 		name     string
@@ -64,8 +73,9 @@ func TestFindEnhancementsIgnores(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
+			ef := defaultTestEnhancementFinder()
 			out := &keps.Proposals{}
-			fe := FindEnhancements(out, &myopener{&os.File{}}, &myparser{}, &mylogger{})
+			fe := ef.Find(out)
 			i := &info{tc.filename}
 			if err := fe("test", i, nil); err != nil {
 				t.Fatalf("%+v", err)
@@ -77,7 +87,7 @@ func TestFindEnhancementsIgnores(t *testing.T) {
 	}
 }
 
-func TestFindEnhancementsFindsEnhancements(t *testing.T) {
+func TestEnhancementFinder(t *testing.T) {
 	testcases := []struct {
 		name     string
 		filename string
@@ -89,9 +99,10 @@ func TestFindEnhancementsFindsEnhancements(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
+			ef := defaultTestEnhancementFinder()
+			ef.parser = &myparser{&keps.Proposal{}}
 			out := &keps.Proposals{}
-			parser := &myparser{&keps.Proposal{}}
-			fe := FindEnhancements(out, &myopener{&os.File{}}, parser, &mylogger{})
+			fe := ef.Find(out)
 			i := &info{tc.filename}
 			if err := fe("test", i, nil); err != nil {
 				t.Fatalf("%+v", err)
@@ -103,20 +114,5 @@ func TestFindEnhancementsFindsEnhancements(t *testing.T) {
 				t.Fatalf("expected proposal to have a filename of %q but had %q", tc.filename, (*out)[0].Filename)
 			}
 		})
-	}
-}
-
-func TestFilters(t *testing.T) {
-	out := &keps.Proposals{}
-	parser := &myparser{&keps.Proposal{
-		Authors: []string{"value"},
-	}}
-	fe := FindEnhancements(out, &myopener{&os.File{}}, parser, &mylogger{}, filter{"author", "value"})
-	i := &info{"test.md"}
-	if err := fe("test", i, nil); err != nil {
-		t.Fatalf("%+v", err)
-	}
-	if len(*out) != 1 {
-		t.Fatalf("Expected 1 item but found: %v", out)
 	}
 }

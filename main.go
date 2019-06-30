@@ -15,58 +15,38 @@ import (
 type config struct {
 	root      string
 	debug     bool
-	filters   filters
 	sortField string
+	validate  bool
 }
 
 func main() {
 	configuration := &config{}
 	list := flag.NewFlagSet("list", flag.ExitOnError)
-	list.StringVar(&configuration.root, "keps", filepath.Join("enhancements", "keps"), "the location of the keps directory")
+	list.StringVar(&configuration.root, "keps", ".", "the location of the keps directory")
 	list.BoolVar(&configuration.debug, "debug", false, "see debug logs")
-	list.Var(&configuration.filters, "filters", "filter keps based on a fields and values (field=value,field2=value2)")
-	list.StringVar(&configuration.sortField, "sort-by", "", "field to sort proposals by, descending")
+	list.BoolVar(&configuration.validate, "validate-only", false, "only run the metadata validations")
 	list.Parse(os.Args[1:])
 
+	ef := NewEnhancementFinder(
+		WithLog(&Logger{configuration.debug}),
+	)
+
 	out := &keps.Proposals{}
-	if err := filepath.Walk(configuration.root,
-		FindEnhancements(out, &Opener{}, keps.NewParser(), &Logger{configuration.debug}, configuration.filters...)); err != nil {
+	if err := filepath.Walk(configuration.root, ef.Find(out)); err != nil {
 		fmt.Printf("%+v", err)
 		os.Exit(2)
 	}
-	out.SortBy(configuration.sortField)
 	for _, proposal := range *out {
+		if proposal.ValidationError != nil {
+			fmt.Printf("%q has a validation error: %v\n", proposal.Filename, proposal.ValidationError)
+		}
+
+		if configuration.validate {
+			continue
+		}
+
 		fmt.Printf("%v\n", proposal.Filename)
 	}
-}
-
-type filters []filter
-
-func (f filters) String() string {
-	out := ""
-	for _, filter := range f {
-		out += fmt.Sprintf("%s=%s", filter.field, filter.value)
-	}
-	return out
-}
-func (f *filters) Set(s string) error {
-	if strings.Index(s, "=") == -1 {
-		return errors.New("filter format is field=value, must contain an =")
-	}
-	fs := strings.Split(s, ",")
-	for _, filter := range fs {
-		split := strings.Split(strings.TrimSpace(filter), "=")
-		*f = append(*f, newFilter(split[0], split[1]))
-	}
-	return nil
-}
-
-type filter struct {
-	field, value string
-}
-
-func newFilter(field, value string) filter {
-	return filter{field, value}
 }
 
 type Logger struct {
@@ -97,45 +77,116 @@ type logger interface {
 	Debugf(format string, args ...interface{})
 }
 
-// FindEnhancements will populate the out struct with any proposals found while
-// walking the filesystem.
-func FindEnhancements(out *keps.Proposals, opener opener, parser parser, log logger, filters ...filter) filepath.WalkFunc {
+func defaultFilters() []filter {
+	return []filter{
+		filenameFilter{
+			func(in string) bool {
+				return strings.HasPrefix(in, "README")
+			},
+			"Ignore READMEs",
+		},
+		filenameFilter{
+			func(in string) bool {
+				return !strings.HasSuffix(in, ".md")
+			},
+			"Ignore non markdown files",
+		},
+		filenameFilter{
+			func(in string) bool {
+				return strings.HasSuffix(in, "template.md")
+			},
+			"Ignore template files",
+		},
+		filenameFilter{
+			func(in string) bool {
+				return in == "kep-faq.md"
+			},
+			"Ignore the kep faq",
+		},
+	}
+}
+
+type filter interface {
+	Filter(string) bool
+}
+type filenameFilter struct {
+	f    func(string) bool
+	name string
+}
+
+func (f filenameFilter) Filter(in string) bool {
+	return f.f(in)
+}
+func (f filenameFilter) String() string {
+	return f.name
+}
+
+// EnhancementFinder can filter out non-enhancement-like filenames in
+// addition to parsing the KEPs and reporting failure statuses
+type EnhancementFinder struct {
+	opener          opener
+	parser          parser
+	filenameFilters []filter
+	log             logger
+}
+
+// NewEnhancementFinder returns a reasonably configured EnhancementFinder
+func NewEnhancementFinder(opts ...finderOpts) *EnhancementFinder {
+	ef := &EnhancementFinder{
+		opener:          &Opener{},
+		parser:          keps.NewParser(),
+		log:             &Logger{},
+		filenameFilters: defaultFilters(),
+	}
+	for _, opt := range opts {
+		opt(ef)
+	}
+	return ef
+}
+
+type finderOpts func(*EnhancementFinder)
+
+// WithOpener sets the object that opens files
+func WithOpener(opener opener) finderOpts {
+	return func(e *EnhancementFinder) { e.opener = opener }
+}
+
+// WithParser sets the parser that prases KEPs
+func WithParser(parser parser) finderOpts {
+	return func(e *EnhancementFinder) { e.parser = parser }
+}
+
+// WithLog defines the logger for the finder
+func WithLog(log logger) finderOpts {
+	return func(e *EnhancementFinder) { e.log = log }
+}
+
+// WithFilenameFilters sets the list of filters the filenames must pass
+func WithFilenameFilters(filters ...filter) finderOpts {
+	return func(e *EnhancementFinder) { e.filenameFilters = filters }
+}
+
+// Find returns a function that filters out filenames and prases a valid KEP file.
+// Is also a WalkFunc.
+func (e *EnhancementFinder) Find(out *keps.Proposals) filepath.WalkFunc {
 	return func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return errors.Wrapf(err, "filename: %v", path)
 		}
-		// Ignore all README* files
-		if strings.HasPrefix(info.Name(), "README") {
-			return nil
+		for _, f := range e.filenameFilters {
+			if f.Filter(info.Name()) {
+				e.log.Debugf("Skipping %q due to filename filter: %v\n", info.Name(), f)
+				return nil
+			}
 		}
-		// Ignore all non-markdown files
-		if !strings.HasSuffix(info.Name(), ".md") {
-			return nil
-		}
-		// Ignore template files
-		if strings.HasSuffix(info.Name(), "template.md") {
-			return nil
-		}
-		// Ignore kep-faq
-		if info.Name() == "kep-faq.md" {
-			return nil
-		}
-		file, err := opener.Open(path)
+		file, err := e.opener.Open(path)
 		if err != nil {
 			return errors.Wrapf(err, "filename: %v", path)
 		}
 		defer file.Close()
-		kep, err := parser.Parse(file)
-		if err != nil {
-			log.Debugf("Error parsing %q\n%v\n", path, err)
-			// parsing errors are ok to skip.
-			return nil
-		}
-		for _, filter := range filters {
-			if !kep.Filter(filter.field, filter.value) {
-				return nil
-			}
-		}
+		// Parse always returns a proposal even on failure.
+		kep, err := e.parser.Parse(file)
+		kep.ValidationError = err
 		kep.Filename = path
 		out.AddProposal(kep)
 		return nil

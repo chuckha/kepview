@@ -39,18 +39,22 @@ func (p *Proposals) SortBy(field string) {
 }
 
 type Proposal struct {
-	Title             string
+	Title             string    `yaml:"title"`
 	Authors           []string  `yaml:,flow`
 	OwningSIG         string    `yaml:"owning-sig"`
 	ParticipatingSIGs []string  `yaml:"participating-sigs",flow`
 	Reviewers         []string  `yaml:,flow`
 	Approvers         []string  `yaml:,flow`
+	Editor            string    `yaml:"editor"`
 	CreationDate      time.Time `yaml:"creation-date"`
 	LastUpdated       time.Time `yaml:"last-updated"`
-	Status            string
-	SeeAlso           []string `yaml:"see-also"`
+	Status            string    `yaml:"status"`
+	SeeAlso           []string  `yaml:"see-also"`
+	Replaces          []string  `yaml:"replaces"`
+	SupersededBy      []string  `yaml:"superseded-by"`
 
-	Filename string `yaml:"-"`
+	Filename        string `yaml:"-"`
+	ValidationError error  `yaml:"-"`
 }
 
 func (p *Proposal) Filter(key, value string) bool {
@@ -98,16 +102,17 @@ func (p *Parser) Parse(in io.Reader) (*Proposal, error) {
 	if err := scanner.Err(); err != nil {
 		return nil, errors.WithStack(err)
 	}
+	proposal := &Proposal{}
+
 	// First do structural checks
 	test := map[interface{}]interface{}{}
 	if err := yaml.Unmarshal(metadata, test); err != nil {
-		return nil, errors.WithStack(err)
+		return proposal, errors.WithStack(err)
 	}
 	if err := validations.ValidateStructure(test); err != nil {
-		return nil, errors.WithStack(err)
+		return proposal, errors.WithStack(err)
 	}
 
-	proposal := &Proposal{}
 	err := yaml.Unmarshal(metadata, proposal)
 	return proposal, errors.WithStack(err)
 }
