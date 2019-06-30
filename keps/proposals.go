@@ -99,10 +99,10 @@ func (p *Parser) Parse(in io.Reader) (*Proposal, error) {
 		metadata = append(metadata, []byte(line)...)
 
 	}
-	if err := scanner.Err(); err != nil {
-		return nil, errors.WithStack(err)
-	}
 	proposal := &Proposal{}
+	if err := scanner.Err(); err != nil {
+		return proposal, errors.WithStack(err)
+	}
 
 	// First do structural checks
 	test := map[interface{}]interface{}{}

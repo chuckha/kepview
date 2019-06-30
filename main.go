@@ -36,9 +36,11 @@ func main() {
 		fmt.Printf("%+v", err)
 		os.Exit(2)
 	}
+	exit := 0
 	for _, proposal := range *out {
 		if proposal.ValidationError != nil {
-			fmt.Printf("%q has a validation error: %v\n", proposal.Filename, proposal.ValidationError)
+			fmt.Printf("%s has a validation error: %q\n", proposal.Filename, proposal.ValidationError)
+			exit = 1
 		}
 
 		if configuration.validate {
@@ -47,6 +49,7 @@ func main() {
 
 		fmt.Printf("%v\n", proposal.Filename)
 	}
+	os.Exit(exit)
 }
 
 type Logger struct {
