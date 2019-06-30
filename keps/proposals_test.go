@@ -41,7 +41,7 @@ status: provisional
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			p := keps.NewParser()
+			p := &keps.Parser{}
 			contents := strings.NewReader(tc.fileContents)
 			out, err := p.Parse(contents)
 			if err != nil {

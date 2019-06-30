@@ -46,7 +46,7 @@ func main() {
 		if configuration.validate {
 			continue
 		}
-
+		// TODO: do something interesting here, perhaps aggregation or sorting.
 		fmt.Printf("%v\n", proposal.Filename)
 	}
 	os.Exit(exit)
@@ -137,7 +137,7 @@ type EnhancementFinder struct {
 func NewEnhancementFinder(opts ...finderOpts) *EnhancementFinder {
 	ef := &EnhancementFinder{
 		opener:          &Opener{},
-		parser:          keps.NewParser(),
+		parser:          &keps.Parser{},
 		log:             &Logger{},
 		filenameFilters: defaultFilters(),
 	}
