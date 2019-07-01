@@ -40,8 +40,8 @@ type myparser struct {
 	proposal *keps.Proposal
 }
 
-func (p *myparser) Parse(reader io.Reader) (*keps.Proposal, error) {
-	return p.proposal, nil
+func (p *myparser) Parse(reader io.Reader) *keps.Proposal {
+	return p.proposal
 }
 
 type myopener struct {

@@ -54,8 +54,8 @@ func main() {
 	}
 	exit := 0
 	for _, proposal := range *out {
-		if proposal.ValidationError != nil {
-			fmt.Printf("%s has a validation error: %q\n", proposal.Filename, proposal.ValidationError)
+		if proposal.Error != nil {
+			fmt.Printf("%s has an error: %q\n", proposal.Filename, proposal.Error)
 			exit = 1
 		}
 
@@ -64,6 +64,9 @@ func main() {
 		}
 		// TODO: do something interesting here, perhaps aggregation or sorting.
 		fmt.Printf("%v\n", proposal.Filename)
+	}
+	if exit == 0 && configuration.validate {
+		fmt.Println("No validation errors")
 	}
 	os.Exit(exit)
 }
@@ -79,7 +82,7 @@ func (l *Logger) Debugf(format string, args ...interface{}) {
 }
 
 type parser interface {
-	Parse(io.Reader) (*keps.Proposal, error)
+	Parse(io.Reader) *keps.Proposal
 }
 
 type opener interface {
@@ -204,8 +207,7 @@ func (e *EnhancementFinder) Find(out *keps.Proposals) filepath.WalkFunc {
 		}
 		defer file.Close()
 		// Parse always returns a proposal even on failure.
-		kep, err := e.parser.Parse(file)
-		kep.ValidationError = err
+		kep := e.parser.Parse(file)
 		kep.Filename = path
 		out.AddProposal(kep)
 		return nil

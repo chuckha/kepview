@@ -48,13 +48,13 @@ type Proposal struct {
 	Replaces          []string  `yaml:"replaces"`
 	SupersededBy      []string  `yaml:"superseded-by"`
 
-	Filename        string `yaml:"-"`
-	ValidationError error  `yaml:"-"`
+	Filename string `yaml:"-"`
+	Error    error  `yaml:"-"`
 }
 
 type Parser struct{}
 
-func (p *Parser) Parse(in io.Reader) (*Proposal, error) {
+func (p *Parser) Parse(in io.Reader) *Proposal {
 	scanner := bufio.NewScanner(in)
 	count := 0
 	metadata := []byte{}
@@ -72,18 +72,21 @@ func (p *Parser) Parse(in io.Reader) (*Proposal, error) {
 	}
 	proposal := &Proposal{}
 	if err := scanner.Err(); err != nil {
-		return proposal, errors.WithStack(err)
+		proposal.Error = errors.Wrap(err, "error reading file")
+		return proposal
 	}
 
 	// First do structural checks
 	test := map[interface{}]interface{}{}
 	if err := yaml.Unmarshal(metadata, test); err != nil {
-		return proposal, errors.WithStack(err)
+		proposal.Error = errors.Wrap(err, "error unmarshaling YAML")
+		return proposal
 	}
 	if err := validations.ValidateStructure(test); err != nil {
-		return proposal, errors.WithStack(err)
+		proposal.Error = errors.Wrap(err, "error validating KEP metadata")
+		return proposal
 	}
 
-	err := yaml.Unmarshal(metadata, proposal)
-	return proposal, errors.WithStack(err)
+	proposal.Error = yaml.Unmarshal(metadata, proposal)
+	return proposal
 }
