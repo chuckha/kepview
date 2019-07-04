@@ -152,6 +152,7 @@ func FixData(path string, dryRun bool) error {
 		delete(out, key)
 	}
 
+	// keps/sig-network/0010-20180314-coredns-GA-proposal.md
 	// figure out if the types are wrong
 	for key, value := range out {
 		if _, ok := required[key]; ok {
@@ -326,7 +327,7 @@ func escapedValue(val string, originallyHas bool) string {
 	if originallyHas {
 		return fmt.Sprintf(`"%s"`, val)
 	}
-	if val[0] == '@' || val[0] == '[' || val[0] == '/' {
+	if val[0] == '@' || val[0] == '[' || val[0] == '/' || strings.Contains(val, " -") || strings.Contains(val, ":") {
 		return fmt.Sprintf(`"%s"`, val)
 	}
 	return val
@@ -580,7 +581,6 @@ func quoteUnquotedStringStartingWithAtSign(path string, dryRun bool) error {
 }
 
 func writeFile(path string, head, meta, body []byte) error {
-
 	w, err := os.OpenFile(path, os.O_RDWR|os.O_TRUNC, os.ModeAppend)
 	if err != nil {
 		return errors.WithStack(err)
