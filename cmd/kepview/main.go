@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -32,7 +33,6 @@ type config struct {
 	root      string
 	debug     bool
 	sortField string
-	validate  bool
 }
 
 func main() {
@@ -40,7 +40,7 @@ func main() {
 	list := flag.NewFlagSet("list", flag.ExitOnError)
 	list.StringVar(&configuration.root, "keps", ".", "the location of the keps directory")
 	list.BoolVar(&configuration.debug, "debug", false, "see debug logs")
-	list.BoolVar(&configuration.validate, "validate-only", false, "only run the metadata validations")
+	list.StringVar(&configuration.root, "root", "", "the root of the keps dir (enhancements/keps)")
 	list.Parse(os.Args[1:])
 
 	ef := NewEnhancementFinder(
@@ -52,23 +52,12 @@ func main() {
 		fmt.Printf("%+v", err)
 		os.Exit(2)
 	}
-	exit := 0
-	for _, proposal := range *out {
-		if proposal.Error != nil {
-			fmt.Printf("%s has an error: %q\n", proposal.Filename, proposal.Error)
-			exit = 1
-		}
-
-		if configuration.validate {
-			continue
-		}
-		// TODO: do something interesting here, perhaps aggregation or sorting.
-		fmt.Printf("%v\n", proposal.Filename)
+	jsonOut, err := json.Marshal(out)
+	if err != nil {
+		fmt.Printf("%+v", err)
+		os.Exit(2)
 	}
-	if exit == 0 && configuration.validate {
-		fmt.Println("No validation errors")
-	}
-	os.Exit(exit)
+	fmt.Println(string(jsonOut))
 }
 
 type Logger struct {
@@ -124,6 +113,12 @@ func defaultFilters() []filter {
 				return in == "kep-faq.md"
 			},
 			"Ignore the kep faq",
+		},
+		filenameFilter{
+			func(in string) bool {
+				return in == "0023-documentation-for-images.md"
+			},
+			"Ignore the non-kep file",
 		},
 	}
 }
@@ -192,8 +187,11 @@ func WithFilenameFilters(filters ...filter) finderOpts {
 // Is also a WalkFunc.
 func (e *EnhancementFinder) Find(out *keps.Proposals) filepath.WalkFunc {
 	return func(path string, info os.FileInfo, err error) error {
+		if path == "" {
+			return nil
+		}
 		if err != nil {
-			return errors.Wrapf(err, "filename: %v", path)
+			return errors.WithStack(err)
 		}
 		for _, f := range e.filenameFilters {
 			if f.Filter(info.Name()) {
@@ -203,7 +201,7 @@ func (e *EnhancementFinder) Find(out *keps.Proposals) filepath.WalkFunc {
 		}
 		file, err := e.opener.Open(path)
 		if err != nil {
-			return errors.Wrapf(err, "filename: %v", path)
+			return errors.Wrapf(err, "filename: %v", info.Name())
 		}
 		defer file.Close()
 		// Parse always returns a proposal even on failure.

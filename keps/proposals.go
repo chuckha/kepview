@@ -18,6 +18,7 @@ package keps
 
 import (
 	"bufio"
+	"bytes"
 	"io"
 	"strings"
 
@@ -49,6 +50,7 @@ type Proposal struct {
 
 	Filename string `yaml:"-"`
 	Error    error  `yaml:"-"`
+	Contents string `yaml:"-"`
 }
 
 type Parser struct{}
@@ -57,8 +59,13 @@ func (p *Parser) Parse(in io.Reader) *Proposal {
 	scanner := bufio.NewScanner(in)
 	count := 0
 	metadata := []byte{}
+	var body bytes.Buffer
 	for scanner.Scan() {
 		line := scanner.Text() + "\n"
+		body.WriteString(line)
+		if count == 2 {
+			continue
+		}
 		if strings.Contains(line, "---") {
 			count++
 			continue
@@ -66,11 +73,10 @@ func (p *Parser) Parse(in io.Reader) *Proposal {
 		if count == 1 {
 			metadata = append(metadata, []byte(line)...)
 		}
-		if count == 2 {
-			break
-		}
 	}
-	proposal := &Proposal{}
+	proposal := &Proposal{
+		Contents: body.String(),
+	}
 	if err := scanner.Err(); err != nil {
 		proposal.Error = errors.Wrap(err, "error reading file")
 		return proposal
